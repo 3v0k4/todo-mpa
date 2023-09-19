@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>TodoMPA</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+        <link rel="stylesheet" href="https://unpkg.com/todomvc-app-css@2.4.2/index.css" />
+    </head>
+
+    <style>
+        .main:has(.todo-list li) {
+          display: block;
+        }
+
+        .main[data-page="all"] {
+          display: none;
+        }
+    </style>
+
+    <body>
+        <section class="todoapp">
+            <header class="header">
+                <h1>todos</h1>
+                <input
+                    autofocus
+                    class="new-todo"
+                    hx-on::after-request="if(event.detail.successful) this.value = ''"
+                    hx-post="/todos"
+                    hx-swap="beforeend"
+                    hx-target=".todo-list"
+                    name="todo"
+                    placeholder="What needs to be done?"
+                >
+            </header>
+
+            <section data-page="{{ .Page }}" class="main">
+                {{ template "complete-all.tmpl" (eq .TodosLeft 0) }}
+
+                {{ template "todos.tmpl" . }}
+
+                <footer class="footer">
+                    {{ template "active-counter.tmpl" .TodosLeft }}
+
+                    <ul class="filters">
+                        <li>
+                            <a {{ if eq .Page "all" }} class="selected" {{ end }} href="/" hx-boost="true">All</a>
+                        </li>
+
+                        <li>
+                            <a {{ if eq .Page "active" }} class="selected" {{ end }} href="/active" hx-boost="true">Active</a>
+                        </li>
+
+                        <li>
+                            <a {{ if eq .Page "completed" }} class="selected" {{ end }} href="/completed" hx-boost="true">Completed</a>
+                        </li>
+                    </ul>
+
+                    {{ template "clear-completed.tmpl" .HasCompleted }}
+                </footer>
+            </section>
+        </section>
+
+        <footer class="info">
+            <p>Double-click to edit a todo</p>
+            <p>Created by <a href="https://odone.io" target="_blank" rel="noreferrer noopener">Riccardo Odone</a></p>
+            <p>Inspired by <a href="http://todomvc.com" target="_blank" rel="noreferrer noopener">TodoMVC</a></p>
+            <p>Built with Go and HTMX</p>
+        </footer>
+    </body>
+</html>

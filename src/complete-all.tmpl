@@ -1,0 +1,12 @@
+<div hx-get="complete-all" hx-trigger="updatedTodo from:body">
+    <input
+        class="toggle-all"
+        hx-put="/complete-all"
+        hx-swap="outerHTML"
+        hx-target="closest div"
+        id="toggle-all"
+        type="checkbox"
+        {{ if . }} checked {{ end }}
+    >
+    <label for="toggle-all">Mark all as complete</label>
+</div>

@@ -1,0 +1,9 @@
+<div
+    hx-get="/clear-completed"
+    hx-swap="outerHTML"
+    hx-trigger="updatedTodo from:body, completedAll from:body, deletedTodo from:body"
+>
+    {{ if . }}
+        <button class="clear-completed" hx-patch="/clear-completed" hx-target="closest div">Clear completed</button>
+    {{ end }}
+</div>

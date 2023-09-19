@@ -1,0 +1,45 @@
+<li
+    {{ if .Completed }} class="completed" {{ end }}
+    {{ if .Editing }} class="editing" {{ end }}
+>
+    <div class="view">
+        <input
+            class="toggle"
+            hx-patch="/todos/{{ .Id }}/toggle"
+            hx-swap="outerHTML"
+            hx-target="closest li"
+            type="checkbox"
+            {{ if .Completed }} checked {{ end }}
+        >
+        <label
+            hx-get="/todos/{{ .Id }}/edit"
+            hx-swap="outerHTML"
+            hx-target="closest li"
+            hx-trigger="dblclick"
+        >{{ .Todo }}</label>
+
+        <button class="destroy" hx-delete="/todos/{{ .Id }}" hx-swap="outerHTML" hx-target="closest li"></button>
+    </div>
+
+    <input
+        class="edit"
+        hx-patch="/todos/{{ .Id }}/edit"
+        hx-swap="outerHTML"
+        hx-target="closest li"
+        hx-trigger="change"
+        name="todo"
+        value="{{ .Todo }}"
+    >
+
+    {{ if .Editing }}
+        <button
+            hx-get="/todos/{{ .Id }}"
+            hx-swap="outerHTML"
+            hx-target="closest li"
+            hx-trigger="keyup[key=='Escape'] from:body"
+            style="display: none;"
+        >
+            Cancel with the Escape key
+        </button>
+    {{ end }}
+</li>

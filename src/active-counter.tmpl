@@ -1,0 +1,8 @@
+<span
+    class="todo-count"
+    hx-get="/active-counter"
+    hx-swap="outerHTML"
+    hx-trigger="newTodo from:body, updatedTodo from:body, completedAll from:body, deletedTodo from:body"
+>
+    <strong>{{ . }}</strong> item left
+</span>
