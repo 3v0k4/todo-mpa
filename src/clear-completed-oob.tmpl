@@ -1,0 +1,7 @@
+<ul class="todo-list" hx-swap-oob="true" id="todo-list">
+    {{ range .Todos }}
+        {{ template "todo.tmpl" . }}
+    {{ end }}
+</ul>
+
+{{ template "clear-completed.tmpl" .HasCompleted }}

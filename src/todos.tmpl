@@ -1,9 +1,4 @@
-<ul
-    class="todo-list"
-    hx-get="/todos"
-    hx-swap="outerHTML"
-    hx-trigger="clearedCompleted from:body, completedAll from:body, updatedTodo from:body"
->
+<ul class="todo-list" id="todo-list">
     {{ range .Todos }}
         {{ template "todo.tmpl" . }}
     {{ end }}

@@ -30,6 +30,18 @@ type Todo struct {
 	Editing   bool
 }
 
+type DeletedPage struct {
+	TodosLeft    int
+	HasCompleted bool
+}
+
+type TodoOob struct {
+	AllCompleted bool
+	Todo         Todo
+	TodosLeft    int
+	HasCompleted bool
+}
+
 func main() {
 	basePath := os.Getenv("BASE_PATH")
 	if basePath == "" {
@@ -142,44 +154,6 @@ func main() {
 		tmpl.ExecuteTemplate(w, "index.tmpl", data)
 	})
 
-	r.Get("/todos", func(w http.ResponseWriter, r *http.Request) {
-		type TodosPage struct {
-			Todos []Todo
-			Page  string
-		}
-
-		page := "all"
-		if strings.Contains(r.Referer(), "active") {
-			page = "active"
-		} else if strings.Contains(r.Referer(), "completed") {
-			page = "completed"
-		}
-
-		todos, err := allTodos(db)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "fail", http.StatusInternalServerError)
-			return
-		}
-
-		filteredTodos := []Todo{}
-		for _, todo := range todos {
-			if page == "all" {
-				filteredTodos = append(filteredTodos, todo)
-			} else if page == "active" && !todo.Completed {
-				filteredTodos = append(filteredTodos, todo)
-			} else if page == "completed" && todo.Completed {
-				filteredTodos = append(filteredTodos, todo)
-			}
-		}
-
-		tmpl := template.Must(template.ParseFiles([]string{
-			path.Join(basePath, "src", "todos.tmpl"),
-			path.Join(basePath, "src", "todo.tmpl"),
-		}...))
-		tmpl.ExecuteTemplate(w, "todos.tmpl", TodosPage{Todos: filteredTodos, Page: page})
-	})
-
 	r.Get("/todos/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
@@ -223,76 +197,6 @@ func main() {
 			return
 		}
 
-		w.Header().Set("HX-Trigger", "newTodo")
-		tmpl := template.Must(template.ParseFiles([]string{
-			path.Join(basePath, "src", "todo.tmpl"),
-		}...))
-		data := Todo{Id: id, Todo: todo, Completed: completed, Editing: false}
-		tmpl.ExecuteTemplate(w, "todo.tmpl", data)
-	})
-
-	r.Get("/active-counter", func(w http.ResponseWriter, r *http.Request) {
-		res, err := db.Query("select count(*) from todos where completed = false;")
-		if err != nil {
-			http.Error(w, "fail", http.StatusInternalServerError)
-			fmt.Println(err)
-			return
-		}
-		defer res.Close()
-
-		var count int64
-		res.Next()
-		if err := res.Scan(&count); err != nil {
-			fmt.Println(err)
-			http.Error(w, "fail", http.StatusInternalServerError)
-			return
-		}
-
-		tmpl := template.Must(template.ParseFiles([]string{
-			path.Join(basePath, "src", "active-counter.tmpl"),
-		}...))
-		tmpl.ExecuteTemplate(w, "active-counter.tmpl", count)
-	})
-
-	r.Get("/clear-completed", func(w http.ResponseWriter, r *http.Request) {
-		res, err := db.Query("select count(*) from todos where completed = true;")
-		if err != nil {
-			http.Error(w, "fail", http.StatusInternalServerError)
-			fmt.Println(err)
-			return
-		}
-		defer res.Close()
-
-		var count int64
-		res.Next()
-		if err := res.Scan(&count); err != nil {
-			fmt.Println(err)
-			http.Error(w, "fail", http.StatusInternalServerError)
-			return
-		}
-
-		tmpl := template.Must(template.ParseFiles([]string{
-			path.Join(basePath, "src", "clear-completed.tmpl"),
-		}...))
-		tmpl.ExecuteTemplate(w, "clear-completed.tmpl", count > 0)
-	})
-
-	r.Patch("/clear-completed", func(w http.ResponseWriter, r *http.Request) {
-		_, err := db.Exec(`delete from todos where completed = true;`)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "fail", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("HX-Trigger", "clearedCompleted")
-		tmpl := template.Must(template.ParseFiles([]string{
-			path.Join(basePath, "src", "clear-completed.tmpl"),
-		}...))
-		tmpl.ExecuteTemplate(w, "clear-completed.tmpl", false)
-	})
-
-	r.Get("/complete-all", func(w http.ResponseWriter, r *http.Request) {
 		todos, err := allTodos(db)
 		if err != nil {
 			fmt.Println(err)
@@ -308,9 +212,67 @@ func main() {
 		}
 
 		tmpl := template.Must(template.ParseFiles([]string{
-			path.Join(basePath, "src", "complete-all.tmpl"),
+			path.Join(basePath, "src", "todo-oob.tmpl"),
+			path.Join(basePath, "src", "todo.tmpl"),
 		}...))
-		tmpl.ExecuteTemplate(w, "complete-all.tmpl", todosLeft == 0)
+		todoData := Todo{Id: id, Todo: todo, Completed: completed, Editing: false}
+		data := TodoOob{
+			HasCompleted: len(todos) > todosLeft,
+			Todo:         todoData,
+			TodosLeft:    todosLeft + 1,
+			AllCompleted: false,
+		}
+		tmpl.ExecuteTemplate(w, "todo-oob.tmpl", data)
+	})
+
+	r.Patch("/clear-completed", func(w http.ResponseWriter, r *http.Request) {
+		_, err := db.Exec(`delete from todos where completed = true;`)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "fail", http.StatusInternalServerError)
+			return
+		}
+
+		page := "all"
+		if strings.Contains(r.Referer(), "active") {
+			page = "active"
+		} else if strings.Contains(r.Referer(), "completed") {
+			page = "completed"
+		}
+
+		todos, err := allTodos(db)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "fail", http.StatusInternalServerError)
+			return
+		}
+
+		filteredTodos := []Todo{}
+		for _, todo := range todos {
+			if page == "all" {
+				filteredTodos = append(filteredTodos, todo)
+			} else if page == "active" && !todo.Completed {
+				filteredTodos = append(filteredTodos, todo)
+			} else if page == "completed" && todo.Completed {
+				filteredTodos = append(filteredTodos, todo)
+			}
+		}
+
+		tmpl := template.Must(template.ParseFiles([]string{
+			path.Join(basePath, "src", "clear-completed-oob.tmpl"),
+			path.Join(basePath, "src", "clear-completed.tmpl"),
+			path.Join(basePath, "src", "todos.tmpl"),
+			path.Join(basePath, "src", "todo.tmpl"),
+		}...))
+		type ClearCompletedOob struct {
+			Todos        []Todo
+			HasCompleted bool
+		}
+		data := ClearCompletedOob{
+			Todos:        filteredTodos,
+			HasCompleted: false,
+		}
+		tmpl.ExecuteTemplate(w, "clear-completed-oob.tmpl", data)
 	})
 
 	r.Put("/complete-all", func(w http.ResponseWriter, r *http.Request) {
@@ -337,11 +299,40 @@ func main() {
 			return
 		}
 
-		w.Header().Set("HX-Trigger", "completedAll")
+		updatedTodos := []Todo{}
+		for _, todo := range todos {
+			completedTodo := Todo{
+				Id:        todo.Id,
+				Todo:      todo.Todo,
+				Completed: newStatus,
+				Editing:   false,
+			}
+			updatedTodos = append(updatedTodos, completedTodo)
+		}
+
+		todosLeft = 0
+		if newStatus == false {
+			todosLeft = len(todos)
+		}
+
 		tmpl := template.Must(template.ParseFiles([]string{
+			path.Join(basePath, "src", "complete-all-oob.tmpl"),
 			path.Join(basePath, "src", "complete-all.tmpl"),
+			path.Join(basePath, "src", "todo.tmpl"),
 		}...))
-		tmpl.ExecuteTemplate(w, "complete-all.tmpl", newStatus)
+		type CompleteAllOob struct {
+			HasCompleted bool
+			AllCompleted bool
+			Todos        []Todo
+			TodosLeft    int
+		}
+		data := CompleteAllOob{
+			HasCompleted: len(todos) > 0 && newStatus == true,
+			Todos:        updatedTodos,
+			AllCompleted: newStatus,
+			TodosLeft:    todosLeft,
+		}
+		tmpl.ExecuteTemplate(w, "complete-all-oob.tmpl", data)
 	})
 
 	r.Get("/todos/{id}/edit", func(w http.ResponseWriter, r *http.Request) {
@@ -386,9 +377,28 @@ func main() {
 				return
 			}
 
-			w.Header().Set("HX-Trigger", "deletedTodo")
-			tmpl := template.Must(template.New("").Parse(""))
-			tmpl.Execute(w, nil)
+			todos, err := allTodos(db)
+			if err != nil {
+				fmt.Println(err)
+				http.Error(w, "fail", http.StatusInternalServerError)
+				return
+			}
+
+			actives := []Todo{}
+			completeds := []Todo{}
+			for _, todo := range todos {
+				if todo.Completed {
+					completeds = append(completeds, todo)
+				} else {
+					actives = append(actives, todo)
+				}
+			}
+
+			tmpl := template.Must(template.ParseFiles([]string{
+				path.Join(basePath, "src", "deleted.tmpl"),
+			}...))
+			data := DeletedPage{TodosLeft: len(actives), HasCompleted: len(completeds) > 0}
+			tmpl.ExecuteTemplate(w, "deleted.tmpl", data)
 
 		} else {
 			rows, err := db.Query("update todos set todo=(?) where id = (?) returning id, todo, completed;", todo, id)
@@ -432,9 +442,28 @@ func main() {
 			return
 		}
 
-		w.Header().Set("HX-Trigger", "deletedTodo")
-		tmpl := template.Must(template.New("").Parse(""))
-		tmpl.Execute(w, nil)
+		todos, err := allTodos(db)
+		if err != nil {
+			fmt.Println(err)
+			http.Error(w, "fail", http.StatusInternalServerError)
+			return
+		}
+
+		actives := []Todo{}
+		completeds := []Todo{}
+		for _, todo := range todos {
+			if todo.Completed {
+				completeds = append(completeds, todo)
+			} else {
+				actives = append(actives, todo)
+			}
+		}
+
+		tmpl := template.Must(template.ParseFiles([]string{
+			path.Join(basePath, "src", "deleted.tmpl"),
+		}...))
+		data := DeletedPage{TodosLeft: len(actives), HasCompleted: len(completeds) > 0}
+		tmpl.ExecuteTemplate(w, "deleted.tmpl", data)
 	})
 
 	r.Patch("/todos/{id}/toggle", func(w http.ResponseWriter, r *http.Request) {
@@ -445,10 +474,23 @@ func main() {
 			return
 		}
 
-		todo, err := findTodo(id, db)
+		todos, err := allTodos(db)
 		if err != nil {
-			http.Error(w, "fail", http.StatusInternalServerError)
 			fmt.Println(err)
+			http.Error(w, "fail", http.StatusInternalServerError)
+			return
+		}
+
+		var todo *Todo
+		for _, t := range todos {
+			if t.Id == id {
+				todo = &t
+				break
+			}
+		}
+		if todo == nil {
+			fmt.Println("todo not found")
+			http.Error(w, "fail", http.StatusInternalServerError)
 			return
 		}
 
@@ -459,12 +501,30 @@ func main() {
 			return
 		}
 
-		w.Header().Set("HX-Trigger", "updatedTodo")
+		todosLeft := 0
+		if todo.Completed {
+			todosLeft = 1
+		} else {
+			todosLeft = -1
+		}
+		for _, todo := range todos {
+			if !todo.Completed {
+				todosLeft += 1
+			}
+		}
+
 		tmpl := template.Must(template.ParseFiles([]string{
+			path.Join(basePath, "src", "todo-oob.tmpl"),
 			path.Join(basePath, "src", "todo.tmpl"),
 		}...))
-		data := Todo{Id: todo.Id, Todo: todo.Todo, Completed: !todo.Completed, Editing: false}
-		tmpl.ExecuteTemplate(w, "todo.tmpl", data)
+		todoData := Todo{Id: todo.Id, Todo: todo.Todo, Completed: !todo.Completed, Editing: false}
+		data := TodoOob{
+			HasCompleted: len(todos) > todosLeft,
+			Todo:         todoData,
+			TodosLeft:    todosLeft,
+			AllCompleted: todosLeft == 0,
+		}
+		tmpl.ExecuteTemplate(w, "todo-oob.tmpl", data)
 	})
 
 	r.Post("/reset", func(w http.ResponseWriter, r *http.Request) {
@@ -501,29 +561,6 @@ func allTodos(db *sql.DB) ([]Todo, error) {
 		}
 
 		todos = append(todos, Todo{Id: id, Todo: todo, Completed: completed})
-	}
-
-	return todos, nil
-}
-
-func whereTodos(completed bool, db *sql.DB) ([]Todo, error) {
-	rows, err := db.Query(`select id, todo, completed from todos where completed = (?) order by id asc;`, completed)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	todos := []Todo{}
-	for rows.Next() {
-		var id int64
-		var todo string
-		var completed bool
-
-		if err := rows.Scan(&id, &todo, &completed); err != nil {
-			return nil, err
-		}
-
-		todos = append(todos, Todo{Id: id, Todo: todo, Completed: completed, Editing: false})
 	}
 
 	return todos, nil

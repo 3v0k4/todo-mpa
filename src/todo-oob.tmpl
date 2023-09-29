@@ -1,0 +1,30 @@
+<span class="todo-count" hx-swap-oob="true" id="todo-count">
+    <strong>{{ .TodosLeft }}</strong> item left
+</span>
+
+<div hx-swap-oob="true" id="clear-completed">
+    {{ if .HasCompleted }}
+        <button
+            class="clear-completed"
+            hx-patch="/clear-completed"
+            hx-target="closest div"
+        >
+            Clear completed
+        </button>
+    {{ end }}
+</div>
+
+<div hx-swap-oob="true" id="toggle-all-container">
+    <input
+        class="toggle-all"
+        hx-put="/complete-all"
+        hx-swap="outerHTML"
+        hx-target="closest div"
+        id="toggle-all"
+        type="checkbox"
+        {{ if .AllCompleted }} checked {{ end }}
+    >
+    <label for="toggle-all">Mark all as complete</label>
+</div>
+
+{{ template "todo.tmpl" .Todo }}
