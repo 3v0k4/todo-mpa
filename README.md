@@ -22,4 +22,7 @@ You'll find two branches in this repository, where I explored the following ques
 ```bash
 # install go
 BASE_PATH="$(pwd)" go run src/main.go
+
+# create database
+curl -X POST http://127.0.0.1:3000/reset
 ```
