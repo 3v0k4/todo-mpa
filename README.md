@@ -6,7 +6,7 @@ What's wild is that TodoMVC was created to highlight how frontend frameworks ena
 
 TodoMPA is written in Go and, most importantly, [HTMX](https://htmx.org/).
 
-Coded with ❤️  and 🤯 by [Riccardo Odone](https://odone.io).
+Coded with ❤️  and 🤯 by [Riccardo Odone](https://odone.me).
 
 ## Additional Notes
 
